@@ -2,7 +2,7 @@ import time, aiohttp
 import urllib.parse
 
 
-async def process_commands(self, response, *, cmd:str):
+async def process_commands(response, cmd:str):
 		
 		cmd = cmd.lower()
 
@@ -38,7 +38,7 @@ async def process_commands(self, response, *, cmd:str):
 
 			response.message(f"Weather at {location}\n\n```Lat:``` *{lat}*\n```Lon:``` *{lon}*\n\n"
 											f"```Max:``` *{round(max_temp)}*\n```Min:``` *{round(min_temp)}*\n\n"
-											f"```Weather   :``` *{weather}**\n\n"
+											f"```Weather   :``` *{weather}*\n\n"
 											f"```Pressure  :``` *{press}*\n"
 											f"```Humidity  :``` *{humidity}*\n"
 											f"```Visiblity :``` *{visiblity}*\n"

@@ -1,9 +1,4 @@
-from os import system as sys
-from datetime import datetime
-import json
-sys('pip install lxml')
 
-from pygicord import Paginator
 from yaml import safe_load as yaml_load
 
 import asyncio
@@ -15,9 +10,7 @@ from io import BytesIO
 from hashlib import algorithms_available as algorithms
 
 import aiohttp
-import requests 
 
-import textwrap
 # from pytio import Tio, TioRequest
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
@@ -25,18 +18,10 @@ from bs4.element import NavigableString
 import hashlib 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import _ref, _doc
-from _used import typing, get_raw, paste
+from _used import get_raw, paste
 from _tio import Tio
 
-#class Coding(commands.Cog, name="RTFM Bot"):
-#		"""To test code and check docs"""
-
-#		def __init__(self, bot):
-#				self.bot = bot
-#				self.algos = sorted([h for h in hashlib.algorithms_available if h.islower()])
-#				
-#				self.bot.languages = ()
-def get_content(self, tag):
+def get_content(tag):
 	"""Returns content between two h2 tags"""
 
 	bssiblings = tag.next_siblings
@@ -87,9 +72,15 @@ documented = {
 		'python': _doc.python_doc
 }
 
-async def run(response, language, code:str=''):
+async def run(response, arguments:str):
 			"""Execute code in a given programming language"""
 			# Powered by tio.run
+
+			arguments = arguments.split(" ", 1)
+
+			language = str(arguments[0])
+			code = str(arguments[1])
+
 			with open('default_langs.yml', 'r') as file: default = yaml_load(file)
 			options = {
 					'--stats': False,
@@ -103,7 +94,7 @@ async def run(response, language, code:str=''):
 			# Setting options and removing them from the beginning of the command
 			# options may be separated by any single whitespace, which we keep in the list
 			code = re.split(r'(\s)', code, maxsplit=optionsAmount)
-
+	
 			for option in options:
 					if option in code[:optionsAmount*2]:
 							options[option] = True
@@ -136,27 +127,27 @@ async def run(response, language, code:str=''):
 			text = None
 
 			
-			if ctx.message.attachments:
-					# Code in file
-					file = ctx.message.attachments[0]
-					if file.size > 20000:
-							return await response.message("File must be smaller than 20 kio.")
-					buffer = BytesIO()
-					await ctx.message.attachments[0].save(buffer)
-					text = buffer.read().decode('utf-8')
-			elif code.split(' ')[-1].startswith('link='):
+			#if ctx.message.attachments:
+			#		# Code in file
+			#		file = ctx.message.attachments[0]
+			#		if file.size > 20000:
+			#				return await response.message("File must be smaller than 20 kio.")
+			#		buffer = BytesIO()
+			#		await ctx.message.attachments[0].save(buffer)
+			#		text = buffer.read().decode('utf-8')
+			if code.split(' ')[-1].startswith('link='):
 					# Code in a webpage
 					base_url = urllib.parse.quote_plus(code.split(' ')[-1][5:].strip('/'), safe=';/?:@&=$,><-[]')
 
 					url = get_raw(base_url)
 
 					async with aiohttp.ClientSession() as client_session:
-							async with client_session.get(url) as response:
-									if response.status == 404:
+							async with client_session.get(url) as res:
+									if res.status == 404:
 											return response.message('Nothing found. Check your link')
-									elif response.status != 200:
-											return response.message(f'An error occurred (status code: {response.status}). Retry later.')
-									text = await response.text()
+									elif res.status != 200:
+											return response.message(f'An error occurred (status code: {res.status}). Retry later.')
+									text = await res.text()
 									if len(text) > 20000:
 											return response.message('Code must be shorter than 20,000 characters.')
 			elif code.strip('`'):
@@ -165,12 +156,12 @@ async def run(response, language, code:str=''):
 					firstLine = text.splitlines()[0]
 					if re.fullmatch(r'( |[0-9A-z]*)\b', firstLine):
 							text = text[len(firstLine)+1:]
-
+			print(text)
 			if text is None:
 					# Ensures code isn't empty after removing options
 					return
 
-			# common identifiers, also used in highlight.js and thus discord codeblocks
+
 			quickmap = {
 					'asm': 'assembly',
 					'c#': 'cs',
@@ -193,7 +184,8 @@ async def run(response, language, code:str=''):
 					lang = default[lang]
 			
 			with open('lang.txt') as f:
-				languages = f.read
+				languages = f.read()
+				
 			if not lang in languages:
 					matches = '\n'.join([language for language in languages if lang in language][:10])
 					
@@ -213,7 +205,7 @@ async def run(response, language, code:str=''):
 									break
 
 			tio = Tio(lang, text, compilerFlags=compilerFlags, inputs=inputs, commandLineOptions=commandLineOptions, args=args)
-
+			print(1)
 			result = await tio.send()
 
 			if not options['--stats']:
@@ -238,47 +230,48 @@ async def run(response, language, code:str=''):
 
 			# ph, as placeholder, prevents Discord from taking the first line
 			# as a language identifier for markdown and remove it
-			response.message(f'```ph\n{result}```')
+			print(result)
+			response.message(f'Output:\n```{result}```')
 
 		
 
-async def reference(response, language, *, query: str):
+async def reference(response, language, query: str):
 			"""Returns element reference from given language"""
 
 			lang = language.strip('`')
 
 			if not lang.lower() in referred:
-					return await response.message(f"{lang} not available. See `[p]list references` for available ones.")
-			await referred[lang.lower()](ctx, query.strip('`'))
+					return response.message(f"{lang} not available. See `list references` for available ones.")
+			await referred[lang.lower()](response, query.strip('`'))
 
-async def documentation(response, language, *, query: str):
+async def documentation(response, language, query: str):
 			"""Returns element reference from given language"""
 
 			lang = language.strip('`')
 
 			if not lang.lower() in documented:
-					return await response.message(f"{lang} not available. See `[p]list documentations` for available ones.")
-			await documented[lang.lower()](ctx, query.strip('`'))
+					return response.message(f"{lang} not available. See `list documentations` for available ones.")
+			await documented[lang.lower()](response, query.strip('`'))
 			
 
-async def man(self, ctx, *, page: str):
+async def man(response, page: str):
 			"""Returns the manual's page for a (mostly Debian) linux command"""
 
 			base_url = f'https://man.cx/{page}'
 			url = urllib.parse.quote_plus(base_url, safe=';/?:@&=$,><-[]')
 
 			async with aiohttp.ClientSession() as client_session:
-					async with client_session.get(url) as response:
-							if response.status != 200:
-									return await ctx.send('An error occurred (status code: {response.status}). Retry later.')
+					async with client_session.get(url) as res:
+							if res.status != 200:
+									return response.message(f'An error occurred (status code: {res.status}). Retry later.')
 
-							soup = BeautifulSoup(await response.text(), 'lxml')
+							soup = BeautifulSoup(await res.text(), 'lxml')
 
 							nameTag = soup.find('h2', string='NAME\n')
 
 							if not nameTag:
 									# No NAME, no page
-									return await ctx.send(f'No manual entry for `{page}`. (Debian)')
+									return response.message(f'No manual entry for `{page}`. (Debian)')
 
 							# Get the two (or less) first parts from the nav aside
 							# The first one is NAME, we already have it in nameTag
@@ -287,98 +280,92 @@ async def man(self, ctx, *, page: str):
 							if contents[-1].string == 'COMMENTS':
 									contents.remove(-1)
 
-							title = self.get_content(nameTag)
+							title = get_content(nameTag)
 
-							emb = discord.Embed(title=title, url=f'https://man.cx/{page}')
-							emb.set_author(name='Debian Linux man pages')
-							emb.set_thumbnail(url='https://www.debian.org/logos/openlogo-nd-100.png')
-
+							main = ''
 							for tag in contents:
 									h2 = tuple(soup.find(attrs={'name': tuple(tag.children)[0].get('href')[1:]}).parents)[0]
-									emb.add_field(name=tag.string, value=self.get_content(h2))
+									main = main + f"{tag.string}\n```{get_content(h2)}```\n\n"
 
-							await ctx.send(embed=emb)
+							response.message(f"*{title}*\n{url}\n\n{main}\n\nDebian Linux man pages")
 
 
 
-async def list(self, ctx, *, group=None):
+async def list(response, group:str):
 			"""Lists available choices for other commands"""
 
 			choices = {
-					"documentations": self.documented,
+					"documentations": documented,
 					"hashing": sorted([h for h in algorithms if h.islower()]),
-					"references": self.referred,
-					"wrapped argument": self.wrapping,
+					"references": referred,
+					"wrapped argument": wrapping,
 			}
 
 			if group == 'languages':
-					emb = discord.Embed(title=f"Available for {group}:",
-							description='View them on [tio.run](https://tio.run/#), or in [JSON format](https://tio.run/languages.json)')
-					return await ctx.send(embed=emb)
+					description='View them on (https://tio.run/#), or in (https://tio.run/languages.json)'
+					return response.message(f"Available for {group}:\n\n```{description}```")
 
 			if not group in choices:
-					emb = discord.Embed(title="Available listed commands", description=f"`languages`, `{'`, `'.join(choices)}`")
-					return await ctx.send(embed=emb)
+					title="Available listed commands"
+					description=f"`languages`, `{'`, `'.join(choices)}`"
+					return response.message(f"{title}\n\n```{description}```")
 
 			availables = choices[group]
 			description=f"`{'`, `'.join([*availables])}`"
-			emb = discord.Embed(title=f"Available for {group}: {len(availables)}", description=description)
-			await ctx.send(embed=emb)
+			title=f"Available for {group}: {len(availables)}"
+			description=description
+			return response.message(f"{title}\n\n```{description}```")
 	
 
-async def ascii(self, ctx, *, text: str):
+async def ascii(response, text: str):
 			"""Returns number representation of characters in text"""
+	
+			response.message(f"Unicode Convert\n\n```{' '.join([str(ord(letter)) for letter in text])}```")
 
-			emb = discord.Embed(title="Unicode convert", description=' '.join([str(ord(letter)) for letter in text]))
-			emb.set_footer(text=f'Invoked by {str(ctx.message.author)}')
-			await ctx.send(embed=emb)
-
-async def unascii(self, ctx, *, text: str):
+async def unascii(response, text: str):
 			"""Reforms string from char codes"""
 
 			try:
 					codes = [chr(int(i)) for i in text.split(' ')]
-					emb = discord.Embed(title="Unicode convert",
-							description=''.join(codes))
-					emb.set_footer(text=f'Invoked by {str(ctx.message.author)}')
-					await ctx.send(embed=emb)
+					await response.message(f"Unicode Convert\n\n```{''.join(codes)}```")
 			except ValueError:
-					await ctx.send("Invalid sequence. Example usage : `[p]unascii 104 101 121`")
+					response.message("Invalid sequence. Example usage : `[p]unascii 104 101 121`")
 	
 
-async def byteconvert(self, ctx, value: int, unit='Mio'):
+async def byteconvert(response, value: int, unit='Mio'):
 			"""Shows byte conversions of given value"""
 
 			units = ('o', 'Kio', 'Mio', 'Gio', 'Tio', 'Pio', 'Eio', 'Zio', 'Yio')
 			unit = unit.capitalize()
 
 			if not unit in units and unit != 'O':
-					return await ctx.send(f"Available units are `{'`, `'.join(units)}`.")
+					return response.message(f"Available units are `{'`, `'.join(units)}`.")
 
-			emb = discord.Embed(title="Binary conversions")
+			title = "Binary conversions"
 			index = units.index(unit)
 
+			main = ""
 			for i,u in enumerate(units):
 					result = round(value / 2**((i-index)*10), 14)
-					emb.add_field(name=u, value=result)
+					main = main + "{} : {}\n".format(u, result)
 
-			await ctx.send(embed=emb)
+			return response.message(f"Result:\n```\n{main}")
 	
 
-async def _hash(self, ctx, algorithm, *, text: str):
+async def _hash(response, algorithm, text: str):
 			"""
 			Hashes text with a given algorithm
 			UTF-8, returns under hexadecimal form
 			"""
 
 			algo = algorithm.lower()
-
-			if not algo in self.algos:
-					matches = '\n'.join([supported for supported in self.algos if algo in supported][:10])
+			algos = sorted([h for h in hashlib.algorithms_available if h.islower()])
+			if not algo in algos:
+					matches = '\n'.join([supported for supported in algos if algo in supported][:10])
 					message = f"`{algorithm}` not available."
 					if matches:
 							message += f" Did you mean:\n{matches}"
-					return await ctx.send(message)
+					return response.message(message)
 
 			try:
 					# Guaranteed one
@@ -387,10 +374,7 @@ async def _hash(self, ctx, algorithm, *, text: str):
 					# Available
 					hash_object = hashlib.new(algo, text.encode('utf-8'))
 
-			emb = discord.Embed(title=f"{algorithm} hash",
-													description=hash_object.hexdigest())
-			emb.set_footer(text=f'Invoked by {str(ctx.message.author)}')
-
-			await ctx.send(embed=emb)
+			
+			response.message(f"{algorithm} hash\n\n```{hash_object.hexdigest()}```")
 
 

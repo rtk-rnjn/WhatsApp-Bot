@@ -1,7 +1,4 @@
-import functools
-
 import aiohttp
-from discord.ext import commands
 
 
 def get_raw(link):
@@ -48,13 +45,3 @@ async def paste(text):
         post = await aioclient.post("https://bin.readthedocs.fr/new", data={'code': text, 'lang': 'txt'})
         if post.status == 200:
             return post.url
-
-
-def typing(func):
-    @functools.wraps(func)
-    async def wrapped(*args, **kwargs):
-        context = args[0] if isinstance(args[0], commands.Context) else args[1]
-        async with context.typing():
-            await func(*args, **kwargs)
-
-    return wrapped

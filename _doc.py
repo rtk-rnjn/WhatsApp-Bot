@@ -3,116 +3,110 @@ from functools import partial
 from string import ascii_uppercase
 
 import aiohttp
-import discord
+
 from bs4 import BeautifulSoup
 
 
-async def python_doc(ctx, text: str):
-    """Filters python.org results based on your query"""
+async def python_doc(response, text: str):
+		"""Filters python.org results based on your query"""
 
-    text = text.strip('`')
+		text = text.strip('`')
 
-    url = "https://docs.python.org/3/genindex-all.html"
-    alphabet = '_' + ascii_uppercase
+		url = "https://docs.python.org/3/genindex-all.html"
+		alphabet = '_' + ascii_uppercase
 
-    async with aiohttp.ClientSession() as client_session:
-        async with client_session.get(url) as response:
-            if response.status != 200:
-                return await ctx.send('An error occurred (status code: {response.status}). Retry later.')
+		async with aiohttp.ClientSession() as client_session:
+				async with client_session.get(url) as res:
+						if res.status != 200:
+								return response.message(f'An error occurred (status code: {response.status}). Retry later.')
+						else: response.message("Just a second!")
+						soup = BeautifulSoup(str(await res.text()), 'lxml')
 
-            soup = BeautifulSoup(str(await response.text()), 'lxml')
+						def soup_match(tag):
+								return all(string in tag.text for string in text.strip().split()) and tag.name == 'li'
 
-            def soup_match(tag):
-                return all(string in tag.text for string in text.strip().split()) and tag.name == 'li'
+						elements = soup.find_all(soup_match, limit=10)
+						links = [tag.select_one("li > a") for tag in elements]
+						links = [link for link in links if link is not None]
 
-            elements = soup.find_all(soup_match, limit=10)
-            links = [tag.select_one("li > a") for tag in elements]
-            links = [link for link in links if link is not None]
+						if not links:
+								return response.message("No results")
 
-            if not links:
-                return await ctx.send("No results")
+						content = [f"{a.string}\nhttps://docs.python.org/3/{a.get('href')}\n" for a in links]
 
-            content = [f"[{a.string}](https://docs.python.org/3/{a.get('href')})" for a in links]
+						value='\n'.join(content)
 
-            emb = discord.Embed(title="Python 3 docs")
-            emb.set_thumbnail(url='https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Python-logo-notext.svg/240px-Python-logo-notext.svg.png')
-            emb.add_field(name=f'Results for `{text}` :', value='\n'.join(content), inline=False)
+						response.message(f"Python3 Doc\n\nResult for *{text}*\n\n{value}")
 
-            await ctx.send(embed=emb)
+async def _cppreference(language, response, text: str):
+		"""Search something on cppreference"""
 
-async def _cppreference(language, ctx, text: str):
-    """Search something on cppreference"""
+		text = text.strip('`')
 
-    text = text.strip('`')
+		base_url = 'https://cppreference.com/w/cpp/index.php?title=Special:Search&search=' + text
+		url = urllib.parse.quote_plus(base_url, safe=';/?:@&=$,><-[]')
 
-    base_url = 'https://cppreference.com/w/cpp/index.php?title=Special:Search&search=' + text
-    url = urllib.parse.quote_plus(base_url, safe=';/?:@&=$,><-[]')
+		async with aiohttp.ClientSession() as client_session:
+				async with client_session.get(url) as res:
+						if res.status != 200:
+								return response.message(f'An error occurred (status code: {res.status}). Retry later.')
+						else: response.message("Just a second!")
+						soup = BeautifulSoup(await res.text(), 'lxml')
 
-    async with aiohttp.ClientSession() as client_session:
-        async with client_session.get(url) as response:
-            if response.status != 200:
-                return await ctx.send(f'An error occurred (status code: {response.status}). Retry later.')
+						uls = soup.find_all('ul', class_='mw-search-results')
 
-            soup = BeautifulSoup(await response.text(), 'lxml')
+						if not len(uls):
+								return response.message('No results')
 
-            uls = soup.find_all('ul', class_='mw-search-results')
+						if language == 'C':
+								wanted = 'w/c/'
+								url = 'https://wikiprogramming.org/wp-content/uploads/2015/05/c-logo-150x150.png'
+						else:
+								wanted = 'w/cpp/'
+								url = 'https://isocpp.org/files/img/cpp_logo.png'
 
-            if not len(uls):
-                return await ctx.send('No results')
+						for elem in uls:
+								if wanted in elem.select_one("a").get('href'):
+										links = elem.find_all('a', limit=10)
+										break
 
-            if language == 'C':
-                wanted = 'w/c/'
-                url = 'https://wikiprogramming.org/wp-content/uploads/2015/05/c-logo-150x150.png'
-            else:
-                wanted = 'w/cpp/'
-                url = 'https://isocpp.org/files/img/cpp_logo.png'
+						content = [f"[{a.string}](https://en.cppreference.com/{a.get('href')})" for a in links]
+						
+						value='\n'.join(content)
 
-            for elem in uls:
-                if wanted in elem.select_one("a").get('href'):
-                    links = elem.find_all('a', limit=10)
-                    break
-
-            content = [f"[{a.string}](https://en.cppreference.com/{a.get('href')})" for a in links]
-            emb = discord.Embed(title=f"{language} docs")
-            emb.set_thumbnail(url=url)
-            emb.add_field(name=f'Results for `{text}` :', value='\n'.join(content), inline=False)
-
-            await ctx.send(embed=emb)
+						response.message(f"{language} Doc\n\nResult for *{text}*\n\n```{value}```")
 
 c_doc = partial(_cppreference, 'C')
 cpp_doc = partial(_cppreference, 'C++')
 
-async def haskell_doc(ctx, text: str):
-    """Search something on wiki.haskell.org"""
+async def haskell_doc(response, text: str):
+		"""Search something on wiki.haskell.org"""
 
-    text = text.strip('`')
+		text = text.strip('`')
 
-    snake = '_'.join(text.split(' '))
+		snake = '_'.join(text.split(' '))
 
-    base_url = f"https://wiki.haskell.org/index.php?title=Special%3ASearch&profile=default&search={snake}&fulltext=Search"
-    url = urllib.parse.quote_plus(base_url, safe=';/?:@&=$,><-[]')
+		base_url = f"https://wiki.haskell.org/index.php?title=Special%3ASearch&profile=default&search={snake}&fulltext=Search"
+		url = urllib.parse.quote_plus(base_url, safe=';/?:@&=$,><-[]')
 
-    async with aiohttp.ClientSession() as client_session:
-        async with client_session.get(url) as response:
-            if response.status != 200:
-                return await ctx.send(f'An error occurred (status code: {response.status}). Retry later.')
+		async with aiohttp.ClientSession() as client_session:
+				async with client_session.get(url) as res:
+						if res.status != 200:
+								return response.message(f'An error occurred (status code: {res.status}). Retry later.')
+						else: response.message("Just a second!")
+						results = BeautifulSoup(await res.text(), 'lxml').find('div', class_='searchresults')
 
-            results = BeautifulSoup(await response.text(), 'lxml').find('div', class_='searchresults')
+						if results.find('p', class_='mw-search-nonefound') or not results.find('span', id='Page_title_matches'):
+								return response.message("No results")
 
-            if results.find('p', class_='mw-search-nonefound') or not results.find('span', id='Page_title_matches'):
-                return await ctx.send("No results")
+						# Page_title_matches is first
+						ul = results.find('ul', 'mw-search-results')
 
-            # Page_title_matches is first
-            ul = results.find('ul', 'mw-search-results')
+						content = []
+						for li in ul.find_all('li', limit=10):
+								a = li.find('div', class_='mw-search-result-heading').find('a')
+								content.append(f"[{a.get('title')}](https://wiki.haskell.org{a.get('href')})")
 
-            emb = discord.Embed(title='Haskell docs')
-            emb.set_thumbnail(url="https://wiki.haskell.org/wikiupload/thumb/4/4a/HaskellLogoStyPreview-1.png/120px-HaskellLogoStyPreview-1.png")
+						value='\n'.join(content)
 
-            content = []
-            for li in ul.find_all('li', limit=10):
-                a = li.find('div', class_='mw-search-result-heading').find('a')
-                content.append(f"[{a.get('title')}](https://wiki.haskell.org{a.get('href')})")
-
-            emb.add_field(name=f'Results for `{text}` :', value='\n'.join(content), inline=False)
-
-            await ctx.send(embed=emb)
+						response.message(f"Haskell Doc\n\nResult for *{text}*\n\n```{value}```")
