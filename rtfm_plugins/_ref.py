@@ -1,7 +1,6 @@
 import re
 import urllib.parse
 from functools import partial
-# import sys
 
 import aiohttp
 
@@ -11,7 +10,7 @@ from markdownify import MarkdownConverter
 
 
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import _used
+import rtfm_plugins._used
 
 
 class DocMarkdownConverter(MarkdownConverter):

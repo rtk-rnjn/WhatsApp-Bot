@@ -1,25 +1,20 @@
 
 from yaml import safe_load as yaml_load
 
-import asyncio
-import os
-import re
-import sys
+import os, re, sys, aiohttp, hashlib
 import urllib.parse
 from io import BytesIO
 from hashlib import algorithms_available as algorithms
 
-import aiohttp
-
 # from pytio import Tio, TioRequest
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
-
-import hashlib 
+ 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import _ref, _doc
-from _used import get_raw, paste
-from _tio import Tio
+import rtfm_plugins._ref as _ref
+import rtfm_plugins._doc as _doc
+from rtfm_plugins._used import get_raw, paste
+from rtfm_plugins._tio import Tio
 
 def get_content(tag):
 	"""Returns content between two h2 tags"""
