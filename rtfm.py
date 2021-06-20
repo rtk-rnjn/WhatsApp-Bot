@@ -151,7 +151,7 @@ async def run(response, arguments:str):
 					firstLine = text.splitlines()[0]
 					if re.fullmatch(r'( |[0-9A-z]*)\b', firstLine):
 							text = text[len(firstLine)+1:]
-			print(text)
+			
 			if text is None:
 					# Ensures code isn't empty after removing options
 					return
@@ -200,7 +200,7 @@ async def run(response, arguments:str):
 									break
 
 			tio = Tio(lang, text, compilerFlags=compilerFlags, inputs=inputs, commandLineOptions=commandLineOptions, args=args)
-			print(1)
+
 			result = await tio.send()
 
 			if not options['--stats']:
@@ -225,7 +225,7 @@ async def run(response, arguments:str):
 
 			# ph, as placeholder, prevents Discord from taking the first line
 			# as a language identifier for markdown and remove it
-			print(result)
+			
 			response.message(f'Output:\n```{result}```')
 
 		

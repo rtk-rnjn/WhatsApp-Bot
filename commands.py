@@ -55,4 +55,6 @@ async def process_commands(response, cmd:str):
 									res = await r.text()
 							else: return
 			if res == '???': msg = "Make sure you use proper syntax"
-			response.message(f"Calculated!\nAnswer: ```{res if res != '???' else None}```\n\n{msg}")
+			response.message(f"Calculated!\n\nAnswer: ```{res if res != '???' else None}```\n\n{msg}")
+
+		#if cmd.split(" ", 1)[0] == 
